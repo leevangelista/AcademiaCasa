@@ -4,13 +4,14 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
 import type { LoggedSet, Session } from "@/lib/types";
-import { today } from "@/lib/util";
+import { formatDate, today } from "@/lib/util";
 import { Button, Card, Header, Loading, Stepper } from "@/components/ui";
 import ExerciseDemo from "@/components/ExerciseDemo";
 
 // weight fica como texto enquanto se digita ("12,5"); vira número ao salvar
 type SetRow = { reps: number; weight: string; done: boolean };
-type Item = { name: string; sets: SetRow[] };
+// lastDate: dia do registro usado para preencher (ausente = veio do plano do treino)
+type Item = { name: string; sets: SetRow[]; lastDate?: string };
 
 function formatWeight(w: number | null): string {
   return w == null ? "" : String(w).replace(".", ",");
@@ -21,13 +22,21 @@ function parseWeight(s: string): number | null {
   return s.trim() && Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-// Pesos da última vez que o exercício foi feito, por número da série
-function lastWeights(sessions: Session[], exercise: string): (number | null)[] {
-  for (const s of sessions) {
-    const sets = s.sets.filter((x) => x.exercise === exercise && x.weight != null);
-    if (sets.length) return sets.map((x) => x.weight);
-  }
-  return [];
+// Séries da última vez que o exercício foi feito: primeiro neste mesmo treino,
+// depois em qualquer treino. As sessões já vêm da mais recente para a mais antiga.
+function lastSets(
+  sessions: Session[],
+  workoutId: string,
+  exercise: string,
+): { date: string; sets: LoggedSet[] } | null {
+  const find = (list: Session[]) => {
+    for (const s of list) {
+      const sets = s.sets.filter((x) => x.exercise === exercise);
+      if (sets.length) return { date: s.date, sets };
+    }
+    return null;
+  };
+  return find(sessions.filter((s) => s.workoutId === workoutId)) ?? find(sessions);
 }
 
 export default function Page() {
@@ -72,12 +81,23 @@ function LogSession() {
         setWorkoutName(w.name);
         setItems(
           w.exercises.map((e) => {
-            const prev = lastWeights(sessions, e.name);
+            const last = lastSets(sessions, w.id, e.name);
+            if (last) {
+              return {
+                name: e.name,
+                lastDate: last.date,
+                sets: last.sets.map((x) => ({
+                  reps: x.reps,
+                  weight: formatWeight(x.weight),
+                  done: false,
+                })),
+              };
+            }
             return {
               name: e.name,
-              sets: Array.from({ length: e.sets }, (_, k) => ({
+              sets: Array.from({ length: e.sets }, () => ({
                 reps: e.reps,
-                weight: formatWeight(prev[k] ?? prev[prev.length - 1] ?? null),
+                weight: "",
                 done: false,
               })),
             };
@@ -195,6 +215,11 @@ function LogSession() {
               {item.sets.every((s) => s.done) ? "Desmarcar" : "Marcar todas"}
             </button>
           </div>
+          {item.lastDate && (
+            <p className="-mt-2 text-xs text-muted">
+              Preenchido com o treino de {formatDate(item.lastDate)}
+            </p>
+          )}
           <ExerciseDemo name={item.name} />
 
           {item.sets.length > 0 && (
