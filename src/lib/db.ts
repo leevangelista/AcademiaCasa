@@ -20,7 +20,13 @@ type SessionRow = {
   workout_id: string | null;
   workout_name: string;
   date: string;
-  session_sets: { position: number; exercise_name: string; set_number: number; reps: number }[];
+  session_sets: {
+    position: number;
+    exercise_name: string;
+    set_number: number;
+    reps: number;
+    weight: number | string | null; // numeric pode chegar como texto
+  }[];
 };
 
 function check<T>(res: { data: T; error: { message: string } | null }): T {
@@ -50,6 +56,7 @@ function toSession(r: SessionRow): Session {
         exercise: s.exercise_name,
         setNumber: s.set_number,
         reps: s.reps,
+        weight: s.weight == null ? null : Number(s.weight),
       }))
       .sort((a, b) => a.position - b.position || a.setNumber - b.setNumber),
   };
@@ -57,7 +64,7 @@ function toSession(r: SessionRow): Session {
 
 const WORKOUT_COLS = "id,name,workout_exercises(position,name,sets,reps)";
 const SESSION_COLS =
-  "id,workout_id,workout_name,date,session_sets(position,exercise_name,set_number,reps)";
+  "id,workout_id,workout_name,date,session_sets(position,exercise_name,set_number,reps,weight)";
 
 const remote = {
   async listWorkouts(): Promise<Workout[]> {
@@ -138,6 +145,7 @@ const remote = {
             exercise_name: x.exercise,
             set_number: x.setNumber,
             reps: x.reps,
+            weight: x.weight,
           })),
         ),
       );

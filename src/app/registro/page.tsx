@@ -3,13 +3,32 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
-import type { LoggedSet } from "@/lib/types";
+import type { LoggedSet, Session } from "@/lib/types";
 import { today } from "@/lib/util";
 import { Button, Card, Header, Loading, Stepper } from "@/components/ui";
 import ExerciseDemo from "@/components/ExerciseDemo";
 
-type SetRow = { reps: number; done: boolean };
+// weight fica como texto enquanto se digita ("12,5"); vira número ao salvar
+type SetRow = { reps: number; weight: string; done: boolean };
 type Item = { name: string; sets: SetRow[] };
+
+function formatWeight(w: number | null): string {
+  return w == null ? "" : String(w).replace(".", ",");
+}
+
+function parseWeight(s: string): number | null {
+  const n = Number(s.trim().replace(",", "."));
+  return s.trim() && Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// Pesos da última vez que o exercício foi feito, por número da série
+function lastWeights(sessions: Session[], exercise: string): (number | null)[] {
+  for (const s of sessions) {
+    const sets = s.sets.filter((x) => x.exercise === exercise && x.weight != null);
+    if (sets.length) return sets.map((x) => x.weight);
+  }
+  return [];
+}
 
 export default function Page() {
   return (
@@ -42,20 +61,27 @@ function LogSession() {
         const byPos = new Map<number, Item>();
         for (const x of s.sets) {
           const item = byPos.get(x.position) ?? { name: x.exercise, sets: [] };
-          item.sets.push({ reps: x.reps, done: true });
+          item.sets.push({ reps: x.reps, weight: formatWeight(x.weight), done: true });
           byPos.set(x.position, item);
         }
         setItems([...byPos.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v));
       });
     } else if (workoutParam) {
-      db.getWorkout(workoutParam).then((w) => {
+      Promise.all([db.getWorkout(workoutParam), db.listSessions()]).then(([w, sessions]) => {
         if (!w) return setItems([]);
         setWorkoutName(w.name);
         setItems(
-          w.exercises.map((e) => ({
-            name: e.name,
-            sets: Array.from({ length: e.sets }, () => ({ reps: e.reps, done: false })),
-          })),
+          w.exercises.map((e) => {
+            const prev = lastWeights(sessions, e.name);
+            return {
+              name: e.name,
+              sets: Array.from({ length: e.sets }, (_, k) => ({
+                reps: e.reps,
+                weight: formatWeight(prev[k] ?? prev[prev.length - 1] ?? null),
+                done: false,
+              })),
+            };
+          }),
         );
       });
     } else {
@@ -78,7 +104,10 @@ function LogSession() {
       list!.map((item, j) => {
         if (j !== i) return item;
         const last = item.sets[item.sets.length - 1];
-        return { ...item, sets: [...item.sets, { reps: last?.reps ?? 10, done: true }] };
+        return {
+          ...item,
+          sets: [...item.sets, { reps: last?.reps ?? 10, weight: last?.weight ?? "", done: true }],
+        };
       }),
     );
   }
@@ -104,7 +133,13 @@ function LogSession() {
       item.sets
         .filter((s) => s.done)
         .forEach((s, n) =>
-          sets.push({ position, exercise: item.name, setNumber: n + 1, reps: s.reps }),
+          sets.push({
+            position,
+            exercise: item.name,
+            setNumber: n + 1,
+            reps: s.reps,
+            weight: parseWeight(s.weight),
+          }),
         );
     });
     if (sets.length === 0) return alert("Marque pelo menos uma série como feita (✓).");
@@ -162,13 +197,34 @@ function LogSession() {
           </div>
           <ExerciseDemo name={item.name} />
 
+          {item.sets.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span className="w-8 text-center">Série</span>
+              <span className="w-[136px] text-center">Repetições</span>
+              <span className="flex-1 text-center">Peso (kg)</span>
+              <span className="w-11" />
+            </div>
+          )}
+
           {item.sets.map((s, k) => (
-            <div key={k} className="flex items-center justify-between gap-2">
-              <span className="w-14 text-sm text-muted">Série {k + 1}</span>
+            <div key={k} className="flex items-center gap-2">
+              <span className="w-8 text-center font-semibold text-muted">{k + 1}</span>
               <Stepper
                 value={s.reps}
                 label={`Repetições da série ${k + 1}`}
                 onChange={(v) => updateSet(i, k, { reps: v })}
+              />
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="–"
+                aria-label={`Peso em kg da série ${k + 1}`}
+                className="h-10 w-full min-w-0 flex-1 rounded-lg border border-border bg-background text-center font-semibold tabular-nums outline-none focus:ring-2 focus:ring-accent"
+                value={s.weight}
+                onChange={(e) =>
+                  updateSet(i, k, { weight: e.target.value.replace(/[^0-9.,]/g, "") })
+                }
+                onFocus={(e) => e.target.select()}
               />
               <button
                 aria-label={s.done ? "Série feita" : "Marcar série como feita"}

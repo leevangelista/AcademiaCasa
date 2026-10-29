@@ -38,7 +38,8 @@ create table if not exists session_sets (
   position int not null,
   exercise_name text not null,
   set_number int not null,
-  reps int not null check (reps >= 0)
+  reps int not null check (reps >= 0),
+  weight numeric(6, 2) check (weight >= 0) -- kg, opcional
 );
 
 create index if not exists workout_exercises_workout_idx on workout_exercises (workout_id);

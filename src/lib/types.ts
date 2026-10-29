@@ -15,6 +15,7 @@ export type LoggedSet = {
   exercise: string;
   setNumber: number;
   reps: number;
+  weight: number | null; // kg; null quando não informado
 };
 
 export type Session = {
