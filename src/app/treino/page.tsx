@@ -4,8 +4,9 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
 import type { Exercise } from "@/lib/types";
-import { EXERCICIOS } from "@/lib/util";
 import { Button, Card, Header, Loading, Stepper } from "@/components/ui";
+import ExerciseDemo from "@/components/ExerciseDemo";
+import ExercisePicker from "@/components/ExercisePicker";
 
 export default function Page() {
   return (
@@ -23,6 +24,8 @@ function EditWorkout() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loaded, setLoaded] = useState(!id);
   const [busy, setBusy] = useState(false);
+  // null: seletor fechado; "new": adicionar; número: trocar o exercício nessa posição
+  const [picking, setPicking] = useState<"new" | number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -87,23 +90,17 @@ function EditWorkout() {
         onChange={(e) => setName(e.target.value)}
       />
 
-      <datalist id="exercicios">
-        {EXERCICIOS.map((e) => (
-          <option key={e} value={e} />
-        ))}
-      </datalist>
-
       {exercises.map((e, i) => (
         <Card key={i} className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-6 text-center font-semibold text-muted">{i + 1}</span>
-            <input
-              className={field}
-              list="exercicios"
-              placeholder="Exercício"
-              value={e.name}
-              onChange={(ev) => update(i, { name: ev.target.value })}
-            />
+          <div className="flex items-start gap-2">
+            <span className="w-6 pt-0.5 text-center font-semibold text-muted">{i + 1}</span>
+            <div className="flex-1">
+              <p className="text-lg font-semibold leading-tight">{e.name}</p>
+              <ExerciseDemo key={e.name} name={e.name} />
+            </div>
+            <button className="pt-0.5 text-sm text-muted" onClick={() => setPicking(i)}>
+              Trocar
+            </button>
           </div>
           <div className="flex justify-between">
             <div className="flex flex-col gap-1">
@@ -138,12 +135,23 @@ function EditWorkout() {
         </Card>
       ))}
 
-      <Button
-        variant="secondary"
-        onClick={() => setExercises((list) => [...list, { name: "", sets: 3, reps: 12 }])}
-      >
+      <Button variant="secondary" onClick={() => setPicking("new")}>
         + Adicionar exercício
       </Button>
+
+      {picking !== null && (
+        <ExercisePicker
+          onClose={() => setPicking(null)}
+          onPick={(picked) => {
+            if (picking === "new") {
+              setExercises((list) => [...list, { name: picked, sets: 3, reps: 12 }]);
+            } else {
+              update(picking, { name: picked });
+            }
+            setPicking(null);
+          }}
+        />
+      )}
 
       <Button onClick={submit} disabled={busy}>
         Salvar treino

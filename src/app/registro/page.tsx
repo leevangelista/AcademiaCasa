@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import type { LoggedSet } from "@/lib/types";
 import { today } from "@/lib/util";
 import { Button, Card, Header, Loading, Stepper } from "@/components/ui";
+import ExerciseDemo from "@/components/ExerciseDemo";
 
 type SetRow = { reps: number; done: boolean };
 type Item = { name: string; sets: SetRow[] };
@@ -159,6 +160,7 @@ function LogSession() {
               {item.sets.every((s) => s.done) ? "Desmarcar" : "Marcar todas"}
             </button>
           </div>
+          <ExerciseDemo name={item.name} />
 
           {item.sets.map((s, k) => (
             <div key={k} className="flex items-center justify-between gap-2">
