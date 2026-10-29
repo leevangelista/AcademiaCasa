@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
 import type { Exercise } from "@/lib/types";
+import { formatDay } from "@/lib/util";
 import { Button, Card, Header, Loading, Stepper } from "@/components/ui";
 import ExerciseDemo from "@/components/ExerciseDemo";
 import ExercisePicker from "@/components/ExercisePicker";
@@ -22,6 +23,7 @@ function EditWorkout() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [createdAt, setCreatedAt] = useState<string>();
   const [loaded, setLoaded] = useState(!id);
   const [busy, setBusy] = useState(false);
   // null: seletor fechado; "new": adicionar; número: trocar o exercício nessa posição
@@ -33,6 +35,7 @@ function EditWorkout() {
       if (w) {
         setName(w.name);
         setExercises(w.exercises);
+        setCreatedAt(w.createdAt);
       }
       setLoaded(true);
     });
@@ -82,6 +85,9 @@ function EditWorkout() {
   return (
     <div className="flex flex-col gap-4">
       <Header title={id ? "Editar treino" : "Novo treino"} back="/" />
+      {createdAt && (
+        <p className="-mt-3 text-sm text-muted">Criado em {formatDay(createdAt)}</p>
+      )}
 
       <input
         className={field}

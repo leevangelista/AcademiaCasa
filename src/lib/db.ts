@@ -12,6 +12,7 @@ import type {
 type WorkoutRow = {
   id: string;
   name: string;
+  created_at: string;
   workout_exercises: { position: number; name: string; sets: number; reps: number }[];
 };
 
@@ -38,6 +39,7 @@ function toWorkout(r: WorkoutRow): Workout {
   return {
     id: r.id,
     name: r.name,
+    createdAt: r.created_at,
     exercises: [...r.workout_exercises]
       .sort((a, b) => a.position - b.position)
       .map(({ name, sets, reps }) => ({ name, sets, reps })),
@@ -62,7 +64,7 @@ function toSession(r: SessionRow): Session {
   };
 }
 
-const WORKOUT_COLS = "id,name,workout_exercises(position,name,sets,reps)";
+const WORKOUT_COLS = "id,name,created_at,workout_exercises(position,name,sets,reps)";
 const SESSION_COLS =
   "id,workout_id,workout_name,date,session_sets(position,exercise_name,set_number,reps,weight)";
 
@@ -185,8 +187,12 @@ const local = {
   },
   async saveWorkout(w: WorkoutInput) {
     const store = load();
-    const item: Workout = { ...w, id: w.id ?? crypto.randomUUID() };
-    const i = store.workouts.findIndex((x) => x.id === item.id);
+    const i = store.workouts.findIndex((x) => x.id === w.id);
+    const item: Workout = {
+      ...w,
+      id: w.id ?? crypto.randomUUID(),
+      createdAt: store.workouts[i]?.createdAt ?? new Date().toISOString(),
+    };
     if (i >= 0) store.workouts[i] = item;
     else store.workouts.push(item);
     save(store);

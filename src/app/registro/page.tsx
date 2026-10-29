@@ -3,15 +3,16 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
-import type { LoggedSet, Session } from "@/lib/types";
+import type { Exercise, LoggedSet, Session } from "@/lib/types";
 import { formatDate, today } from "@/lib/util";
 import { Button, Card, Header, Loading, Stepper } from "@/components/ui";
 import ExerciseDemo from "@/components/ExerciseDemo";
 
 // weight fica como texto enquanto se digita ("12,5"); vira número ao salvar
 type SetRow = { reps: number; weight: string; done: boolean };
-// lastDate: dia do registro usado para preencher (ausente = veio do plano do treino)
-type Item = { name: string; sets: SetRow[]; lastDate?: string };
+// plan: séries×repetições como o treino foi criado (só para consulta)
+// lastDate: dia do registro usado para preencher (ausente = veio do plano)
+type Item = { name: string; sets: SetRow[]; plan?: Exercise; lastDate?: string };
 
 function formatWeight(w: number | null): string {
   return w == null ? "" : String(w).replace(".", ",");
@@ -62,14 +63,19 @@ function LogSession() {
 
   useEffect(() => {
     if (sessionId) {
-      db.getSession(sessionId).then((s) => {
+      db.getSession(sessionId).then(async (s) => {
         if (!s) return setItems([]);
+        const w = s.workoutId ? await db.getWorkout(s.workoutId) : null;
         setWorkoutId(s.workoutId);
         setWorkoutName(s.workoutName);
         setDate(s.date);
         const byPos = new Map<number, Item>();
         for (const x of s.sets) {
-          const item = byPos.get(x.position) ?? { name: x.exercise, sets: [] };
+          const item = byPos.get(x.position) ?? {
+            name: x.exercise,
+            sets: [],
+            plan: w?.exercises.find((e) => e.name === x.exercise),
+          };
           item.sets.push({ reps: x.reps, weight: formatWeight(x.weight), done: true });
           byPos.set(x.position, item);
         }
@@ -85,6 +91,7 @@ function LogSession() {
             if (last) {
               return {
                 name: e.name,
+                plan: e,
                 lastDate: last.date,
                 sets: last.sets.map((x) => ({
                   reps: x.reps,
@@ -95,6 +102,7 @@ function LogSession() {
             }
             return {
               name: e.name,
+              plan: e,
               sets: Array.from({ length: e.sets }, () => ({
                 reps: e.reps,
                 weight: "",
@@ -215,9 +223,14 @@ function LogSession() {
               {item.sets.every((s) => s.done) ? "Desmarcar" : "Marcar todas"}
             </button>
           </div>
-          {item.lastDate && (
+          {(item.plan || item.lastDate) && (
             <p className="-mt-2 text-xs text-muted">
-              Preenchido com o treino de {formatDate(item.lastDate)}
+              {[
+                item.plan && `Plano: ${item.plan.sets}×${item.plan.reps}`,
+                item.lastDate && `Última vez: ${formatDate(item.lastDate)}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           )}
           <ExerciseDemo name={item.name} />

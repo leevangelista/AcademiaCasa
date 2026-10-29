@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import type { Session, Workout } from "@/lib/types";
-import { formatDate } from "@/lib/util";
+import { formatDate, formatDay } from "@/lib/util";
 import { Card, LinkButton, Loading } from "@/components/ui";
 
 export default function Home() {
@@ -52,6 +52,9 @@ export default function Home() {
                 {w.exercises.length > 0 &&
                   " · " + w.exercises.map((e) => e.name).join(", ")}
               </p>
+              {w.createdAt && (
+                <p className="text-xs text-muted">Criado em {formatDay(w.createdAt)}</p>
+              )}
             </div>
             <div className="flex gap-2">
               <LinkButton href={`/registro?treino=${w.id}`} className="flex-1">

@@ -8,6 +8,7 @@ export type Workout = {
   id: string;
   name: string;
   exercises: Exercise[];
+  createdAt?: string; // ISO; definido pelo banco na criação
 };
 
 export type LoggedSet = {
